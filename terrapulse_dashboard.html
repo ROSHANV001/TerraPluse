@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TerraPulse AI — Farm Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:       #0a0f0a;
+    --bg2:      #111811;
+    --bg3:      #192119;
+    --border:   #2a3a2a;
+    --green:    #4ade80;
+    --green2:   #16a34a;
+    --amber:    #fbbf24;
+    --red:      #f87171;
+    --blue:     #60a5fa;
+    --text:     #e8f5e8;
+    --text2:    #8aaa8a;
+    --text3:    #4a6a4a;
+    --pump-on:  #4ade80;
+    --pump-off: #374151;
+  }
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: 'DM Sans', sans-serif; }
+
+  /* ── Grain overlay ───────────────────────────────────── */
+  body::before {
+    content: '';
+    position: fixed; inset: 0;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+    pointer-events: none; z-index: 0;
+  }
+
+  .wrap { position: relative; z-index: 1; max-width: 1280px; margin: 0 auto; padding: 0 24px 48px; }
+
+  /* ── Header ───────────────────────────────────────────── */
+  header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 28px 0 24px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 32px;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; }
+  .logo-icon {
+    width: 40px; height: 40px; border-radius: 10px;
+    background: linear-gradient(135deg, #166534, #4ade80);
+    display: flex; align-items: center; justify-content: center;
+    font-size: 18px;
+  }
+  .logo-text { font-family: 'Syne', sans-serif; font-size: 20px; font-weight: 800; letter-spacing: -0.5px; }
+  .logo-sub  { font-size: 12px; color: var(--text2); margin-top: 1px; }
+  .header-right { display: flex; align-items: center; gap: 16px; }
+  .status-dot {
+    display: flex; align-items: center; gap: 7px;
+    font-size: 12px; color: var(--text2); font-family: 'DM Mono', monospace;
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--text3); }
+  .dot.live { background: var(--green); box-shadow: 0 0 8px var(--green); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.5} }
+  .refresh-btn {
+    padding: 7px 16px; font-size: 12px; border-radius: 8px;
+    background: var(--bg3); border: 1px solid var(--border);
+    color: var(--text2); cursor: pointer; font-family: 'DM Mono', monospace;
+    transition: all .2s;
+  }
+  .refresh-btn:hover { border-color: var(--green); color: var(--green); }
+
+  /* ── Top metrics row ─────────────────────────────────── */
+  .metrics { display: grid; grid-template-columns: repeat(4,1fr); gap: 14px; margin-bottom: 28px; }
+  .metric {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 14px; padding: 18px 20px;
+  }
+  .metric-label { font-size: 11px; color: var(--text3); font-family: 'DM Mono', monospace; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px; }
+  .metric-val   { font-family: 'Syne', sans-serif; font-size: 28px; font-weight: 700; line-height: 1; }
+  .metric-sub   { font-size: 11px; color: var(--text2); margin-top: 5px; }
+  .metric-val.green { color: var(--green); }
+  .metric-val.amber { color: var(--amber); }
+
+  /* ── Section title ───────────────────────────────────── */
+  .section-title {
+    font-family: 'Syne', sans-serif; font-size: 13px; font-weight: 600;
+    text-transform: uppercase; letter-spacing: .1em; color: var(--text3);
+    margin-bottom: 14px;
+  }
+
+  /* ── Zone cards ──────────────────────────────────────── */
+  .zones { display: grid; grid-template-columns: repeat(3,1fr); gap: 16px; margin-bottom: 28px; }
+  .zone-card {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 22px; position: relative; overflow: hidden;
+    transition: border-color .3s;
+  }
+  .zone-card.pump-on { border-color: var(--green2); }
+  .zone-card::before {
+    content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+    background: var(--border); border-radius: 16px 16px 0 0;
+    transition: background .3s;
+  }
+  .zone-card.pump-on::before { background: linear-gradient(90deg, var(--green2), var(--green)); }
+
+  .zone-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px; }
+  .zone-id     { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 800; }
+  .zone-crop   { font-size: 12px; color: var(--text2); margin-top: 2px; text-transform: uppercase; letter-spacing: .06em; }
+  .pump-badge  {
+    padding: 4px 10px; border-radius: 6px; font-family: 'DM Mono', monospace;
+    font-size: 11px; font-weight: 500;
+  }
+  .pump-badge.on  { background: #14532d; color: var(--green); border: 1px solid var(--green2); }
+  .pump-badge.off { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
+
+  .zone-sensors { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 16px; }
+  .sensor-item  { background: var(--bg3); border-radius: 8px; padding: 9px 10px; }
+  .sensor-label { font-size: 10px; color: var(--text3); font-family: 'DM Mono', monospace; margin-bottom: 3px; }
+  .sensor-val   { font-size: 14px; font-weight: 500; font-family: 'DM Mono', monospace; }
+
+  .zone-yield  {
+    display: flex; justify-content: space-between; align-items: center;
+    padding: 12px 14px; background: var(--bg3); border-radius: 10px; margin-bottom: 12px;
+  }
+  .yield-label { font-size: 11px; color: var(--text2); }
+  .yield-val   { font-family: 'Syne', sans-serif; font-size: 18px; font-weight: 700; color: var(--green); }
+
+  .confidence-bar { height: 3px; background: var(--bg3); border-radius: 3px; overflow: hidden; margin-bottom: 10px; }
+  .confidence-fill { height: 100%; background: linear-gradient(90deg, var(--green2), var(--green)); border-radius: 3px; transition: width .8s ease; }
+
+  .zone-reason { font-size: 11px; color: var(--text2); line-height: 1.5; font-style: italic; }
+  .zone-mix    {
+    display: inline-block; margin-top: 8px; padding: 3px 10px; border-radius: 5px;
+    font-size: 10px; font-family: 'DM Mono', monospace; background: var(--bg3);
+    border: 1px solid var(--border); color: var(--amber);
+  }
+  .zone-empty  { display: flex; align-items: center; justify-content: center; min-height: 180px; color: var(--text3); font-size: 13px; }
+
+  /* ── Test panel ──────────────────────────────────────── */
+  .test-panel  {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 24px; margin-bottom: 28px;
+  }
+  .test-grid   { display: grid; grid-template-columns: repeat(4,1fr); gap: 12px; margin-bottom: 16px; }
+  .input-group { display: flex; flex-direction: column; gap: 6px; }
+  .input-label { font-size: 11px; color: var(--text2); font-family: 'DM Mono', monospace; }
+  .tp-input    {
+    background: var(--bg3); border: 1px solid var(--border); border-radius: 8px;
+    color: var(--text); padding: 9px 12px; font-size: 13px; font-family: 'DM Mono', monospace;
+    outline: none; transition: border-color .2s; width: 100%;
+  }
+  .tp-input:focus { border-color: var(--green2); }
+  .tp-select   { appearance: none; cursor: pointer; }
+  .send-btn    {
+    padding: 11px 28px; background: linear-gradient(135deg, var(--green2), #15803d);
+    border: none; border-radius: 10px; color: #fff; font-family: 'Syne', sans-serif;
+    font-size: 14px; font-weight: 600; cursor: pointer; transition: opacity .2s;
+  }
+  .send-btn:hover    { opacity: .85; }
+  .send-btn:disabled { opacity: .4; cursor: not-allowed; }
+  .test-row    { display: flex; align-items: center; gap: 12px; }
+  .test-status { font-size: 12px; font-family: 'DM Mono', monospace; color: var(--text2); }
+
+  /* ── Log ─────────────────────────────────────────────── */
+  .log-panel   {
+    background: var(--bg2); border: 1px solid var(--border);
+    border-radius: 16px; padding: 20px;
+  }
+  .log-list    { list-style: none; }
+  .log-item    {
+    padding: 8px 0; border-bottom: 1px solid var(--border);
+    font-size: 12px; font-family: 'DM Mono', monospace;
+    display: flex; gap: 12px; align-items: baseline;
+  }
+  .log-item:last-child { border-bottom: none; }
+  .log-time    { color: var(--text3); flex-shrink: 0; }
+  .log-msg     { color: var(--text2); }
+  .log-msg.ok  { color: var(--green); }
+  .log-msg.warn{ color: var(--amber); }
+
+  /* ── Responsive ──────────────────────────────────────── */
+  @media(max-width:900px) {
+    .metrics { grid-template-columns: 1fr 1fr; }
+    .zones   { grid-template-columns: 1fr; }
+    .test-grid { grid-template-columns: 1fr 1fr; }
+  }
+  @media(max-width:600px) {
+    .metrics  { grid-template-columns: 1fr; }
+    .test-grid{ grid-template-columns: 1fr; }
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <!-- Header -->
+  <header>
+    <div class="logo">
+      <div class="logo-icon">🌱</div>
+      <div>
+        <div class="logo-text">TerraPulse AI</div>
+        <div class="logo-sub">Precision Agriculture Dashboard</div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="status-dot">
+        <div class="dot" id="status-dot"></div>
+        <span id="status-text">connecting...</span>
+      </div>
+      <button class="refresh-btn" onclick="fetchAllZones()">↻ Refresh</button>
+    </div>
+  </header>
+
+  <!-- Metrics row -->
+  <div class="metrics">
+    <div class="metric">
+      <div class="metric-label">Active Zones</div>
+      <div class="metric-val green" id="m-zones">—</div>
+      <div class="metric-sub">of 3 reporting</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Pumps Running</div>
+      <div class="metric-val amber" id="m-pumps">—</div>
+      <div class="metric-sub">relay active</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">Avg Confidence</div>
+      <div class="metric-val green" id="m-conf">—</div>
+      <div class="metric-sub">crop prediction</div>
+    </div>
+    <div class="metric">
+      <div class="metric-label">API Requests</div>
+      <div class="metric-val" id="m-req">—</div>
+      <div class="metric-sub">total since boot</div>
+    </div>
+  </div>
+
+  <!-- Zone cards -->
+  <div class="section-title">Live Zone Status</div>
+  <div class="zones">
+    <div class="zone-card" id="zone-1"><div class="zone-empty">No data yet — send a reading</div></div>
+    <div class="zone-card" id="zone-2"><div class="zone-empty">No data yet — send a reading</div></div>
+    <div class="zone-card" id="zone-3"><div class="zone-empty">No data yet — send a reading</div></div>
+  </div>
+
+  <!-- Test panel -->
+  <div class="section-title">Send Sensor Reading</div>
+  <div class="test-panel">
+    <div class="test-grid">
+      <div class="input-group">
+        <label class="input-label">Zone</label>
+        <select class="tp-input tp-select" id="in-zone">
+          <option value="1">Zone 1</option>
+          <option value="2">Zone 2</option>
+          <option value="3">Zone 3</option>
+        </select>
+      </div>
+      <div class="input-group">
+        <label class="input-label">Nitrogen (N) mg/kg</label>
+        <input class="tp-input" id="in-N" type="number" value="58" min="0" max="300">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Phosphorus (P) mg/kg</label>
+        <input class="tp-input" id="in-P" type="number" value="57" min="0" max="200">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Potassium (K) mg/kg</label>
+        <input class="tp-input" id="in-K" type="number" value="39" min="0" max="300">
+      </div>
+      <div class="input-group">
+        <label class="input-label">pH</label>
+        <input class="tp-input" id="in-pH" type="number" value="6.4" step="0.1" min="3.5" max="9">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Moisture (%)</label>
+        <input class="tp-input" id="in-moisture" type="number" value="38" min="0" max="100">
+      </div>
+      <div class="input-group">
+        <label class="input-label">Temperature (°C)</label>
+        <input class="tp-input" id="in-temp" type="number" value="19" min="-5" max="55">
+      </div>
+    </div>
+    <div class="test-row">
+      <button class="send-btn" id="send-btn" onclick="sendReading()">
+        ▶ Analyze Zone
+      </button>
+      <span class="test-status" id="test-status"></span>
+    </div>
+  </div>
+
+  <!-- Activity log -->
+  <div class="section-title">Activity Log</div>
+  <div class="log-panel">
+    <ul class="log-list" id="log-list">
+      <li class="log-item">
+        <span class="log-time">--:--:--</span>
+        <span class="log-msg">Dashboard loaded. Waiting for data...</span>
+      </li>
+    </ul>
+  </div>
+
+</div>
+
+<script>
+const API = 'http://localhost:8000';
+const MAX_LOG = 12;
+
+// ── Logging ───────────────────────────────────────────────
+function addLog(msg, type='') {
+  const list = document.getElementById('log-list');
+  const t    = new Date().toTimeString().slice(0,8);
+  const li   = document.createElement('li');
+  li.className = 'log-item';
+  li.innerHTML = `<span class="log-time">${t}</span><span class="log-msg ${type}">${msg}</span>`;
+  list.prepend(li);
+  while (list.children.length > MAX_LOG) list.removeChild(list.lastChild);
+}
+
+// ── Render zone card ──────────────────────────────────────
+function renderZone(d) {
+  const card  = document.getElementById(`zone-${d.zone_id}`);
+  const pumpOn = d.pump === 'ON';
+  card.className = `zone-card ${pumpOn ? 'pump-on' : ''}`;
+
+  const f = d.smoothed_features || {};
+  const sensors = [
+    {l:'N',  v: f.N          != null ? f.N.toFixed(1)   : '—', u:'mg/kg'},
+    {l:'P',  v: f.P          != null ? f.P.toFixed(1)   : '—', u:'mg/kg'},
+    {l:'K',  v: f.K          != null ? f.K.toFixed(1)   : '—', u:'mg/kg'},
+    {l:'pH', v: f.pH         != null ? f.pH.toFixed(2)  : '—', u:''},
+    {l:'H₂O',v: f.moisture   != null ? f.moisture.toFixed(1)+'%': '—', u:''},
+    {l:'°C', v: f.temperature != null ? f.temperature.toFixed(1): '—', u:''},
+  ];
+
+  card.innerHTML = `
+    <div class="zone-header">
+      <div>
+        <div class="zone-id">Zone ${d.zone_id}</div>
+        <div class="zone-crop">${d.recommended_crop} · ${d.confidence}%</div>
+      </div>
+      <div class="pump-badge ${pumpOn ? 'on':'off'}">${pumpOn ? '⬤ PUMP ON':'○ PUMP OFF'}</div>
+    </div>
+    <div class="confidence-bar">
+      <div class="confidence-fill" style="width:${d.confidence}%"></div>
+    </div>
+    <div class="zone-sensors">
+      ${sensors.map(s=>`
+        <div class="sensor-item">
+          <div class="sensor-label">${s.l}</div>
+          <div class="sensor-val">${s.v}</div>
+        </div>`).join('')}
+    </div>
+    <div class="zone-yield">
+      <span class="yield-label">Predicted yield</span>
+      <span class="yield-val">${d.predicted_yield} t/ha</span>
+    </div>
+    <div class="zone-reason">${d.reason}</div>
+    ${pumpOn ? `<div class="zone-mix">mix: ${d.mix}</div>` : ''}
+    <div style="font-size:10px;color:var(--text3);margin-top:8px;font-family:'DM Mono',monospace">${d.timestamp ? d.timestamp.slice(11,19) : ''}</div>
+  `;
+}
+
+// ── Fetch all zone data ───────────────────────────────────
+async function fetchAllZones() {
+  try {
+    const [zonesRes, statusRes] = await Promise.all([
+      fetch(`${API}/zones`),
+      fetch(`${API}/status`),
+    ]);
+
+    if (!zonesRes.ok) throw new Error('Zones fetch failed');
+
+    const zonesData  = await zonesRes.json();
+    const statusData = statusRes.ok ? await statusRes.json() : {};
+
+    // Update status indicator
+    const dot  = document.getElementById('status-dot');
+    const stxt = document.getElementById('status-text');
+    dot.classList.add('live');
+    stxt.textContent = statusData.model_trained ? 'AI online' : 'training...';
+
+    // Render zone cards
+    let activeZones = 0, activePumps = 0, confSum = 0;
+    for (const [zid, data] of Object.entries(zonesData.zones)) {
+      if (data && Object.keys(data).length > 0) {
+        renderZone(data);
+        activeZones++;
+        if (data.pump === 'ON') activePumps++;
+        confSum += data.confidence || 0;
+      }
+    }
+
+    // Update metrics
+    document.getElementById('m-zones').textContent = activeZones;
+    document.getElementById('m-pumps').textContent = activePumps;
+    document.getElementById('m-conf').textContent  = activeZones ? (confSum/activeZones).toFixed(1)+'%' : '—';
+    document.getElementById('m-req').textContent   = statusData.total_requests ?? '—';
+
+  } catch (err) {
+    const dot = document.getElementById('status-dot');
+    dot.classList.remove('live');
+    document.getElementById('status-text').textContent = 'offline';
+    addLog(`Connection failed: ${err.message}`, 'warn');
+  }
+}
+
+// ── Send a manual reading ─────────────────────────────────
+async function sendReading() {
+  const btn = document.getElementById('send-btn');
+  const sts = document.getElementById('test-status');
+
+  const payload = {
+    zone_id:     parseInt(document.getElementById('in-zone').value),
+    N:           parseFloat(document.getElementById('in-N').value),
+    P:           parseFloat(document.getElementById('in-P').value),
+    K:           parseFloat(document.getElementById('in-K').value),
+    pH:          parseFloat(document.getElementById('in-pH').value),
+    moisture:    parseFloat(document.getElementById('in-moisture').value),
+    temperature: parseFloat(document.getElementById('in-temp').value),
+  };
+
+  btn.disabled = true;
+  sts.textContent = 'Analyzing...';
+  addLog(`Sending reading for Zone ${payload.zone_id}...`);
+
+  try {
+    const res  = await fetch(`${API}/analyze`, {
+      method: 'POST',
+      headers: {'Content-Type':'application/json'},
+      body: JSON.stringify(payload),
+    });
+
+    if (!res.ok) {
+      const err = await res.json();
+      throw new Error(err.detail || 'API error');
+    }
+
+    const data = await res.json();
+    renderZone(data);
+    sts.textContent = `✓ ${data.recommended_crop} · ${data.confidence}%`;
+    addLog(`Zone ${data.zone_id} → ${data.recommended_crop} (${data.confidence}%) · pump ${data.pump}`, 'ok');
+
+    // Refresh metrics
+    fetchAllZones();
+
+  } catch (err) {
+    sts.textContent = `Error: ${err.message}`;
+    addLog(`Zone read failed: ${err.message}`, 'warn');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Auto-refresh every 15 seconds ────────────────────────
+fetchAllZones();
+setInterval(fetchAllZones, 15000);
+</script>
+</body>
+</html>
