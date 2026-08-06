@@ -88,4 +88,4 @@ Core system built and confirmed working end-to-end with saved models. Next steps
 - **Hardware team**: ESP32 firmware flashing, sensor wiring
 
 ---
-Built by Roshan Nitin Vyavhare.
+Built by Roshan Nitin Vyavhare and TerraPluse Team.
